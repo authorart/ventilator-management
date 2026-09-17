@@ -1,0 +1,3 @@
+# "Real-time" means always-current-on-load, not live-push
+
+The original problem statement said the hospital "cannot track status แบบ real time," which reads as a live-dashboard requirement. We deliberately interpreted this as: every page shows correct current data as of when it's opened or refreshed, with no WebSocket/SSE push infrastructure — because the actual pain point being solved is a stale paper/spreadsheet registry, not a monitoring wall display. A future reader seeing no live-update code should not assume it was overlooked; add push updates later only if usage shows people are watching the dashboard waiting for a change to appear.

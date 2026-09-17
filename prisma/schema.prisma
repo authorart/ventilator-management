@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EQUIPMENT_CENTER
+  WARD_STAFF
+}
+
+enum WardCategory {
+  DEDICATED // ประจำ
+  RESERVE // สำรอง
+}
+
+enum VentilatorStatus {
+  AVAILABLE // พร้อมใช้งาน
+  IN_USE // กำลังใช้งานกับผู้ป่วย
+  AWAITING_REPAIR // รอซ่อม
+  UNDER_MAINTENANCE // กำลังซ่อมบำรุง
+  DAMAGED_PENDING_DISPOSAL // ชำรุด/รอพิจารณาจำหน่าย
+  DISPOSED // จำหน่ายแล้ว
+}
+
+enum MoveType {
+  ASSIGN // จ่ายประจำ
+  WITHDRAW_RESERVE // เบิกสำรอง/ยืม
+  RETURN_TO_STOCK // คืนคลัง
+  SEND_FOR_REPAIR // ส่งซ่อม
+  RETURN_FROM_REPAIR // รับคืนจากซ่อม
+  DISPOSE // จำหน่าย
+}
+
+enum MaintenanceType {
+  PREVENTIVE // PM
+  CORRECTIVE // CM
+}
+
+enum MaintenanceResult {
+  REPAIRED
+  AWAITING_PARTS
+  UNREPAIRABLE
+}
+
+enum DisposalMethod {
+  SOLD // ขาย
+  DESTROYED // ทำลาย
+  DONATED // บริจาค
+  CONVERTED // แปรสภาพ
+}
+
+enum VendorType {
+  SUPPLIER // ผู้จำหน่าย
+  REPAIR_SERVICE // ผู้รับซ่อม
+  BOTH
+}
+
+model Building {
+  id        String @id @default(cuid())
+  name      String @unique
+  code      String @unique
+  wards     Ward[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Ward {
+  id         String       @id @default(cuid())
+  building   Building     @relation(fields: [buildingId], references: [id])
+  buildingId String
+  name       String
+  category   WardCategory
+  bedCount   Int?
+
+  ventilators      Ventilator[]
+  incomingMoves    LocationHistory[] @relation("MoveDestination")
+  outgoingMoves    LocationHistory[] @relation("MoveOrigin")
+  users            User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([buildingId, name])
+}
+
+model Vendor {
+  id           String     @id @default(cuid())
+  name         String
+  type         VendorType
+  contactPhone String?
+  contactEmail String?
+  address      String?
+
+  ventilatorsSold  Ventilator[]
+  maintenanceJobs  MaintenanceRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id           String   @id @default(cuid())
+  fullName     String
+  username     String   @unique
+  passwordHash String
+  role         Role
+  homeWard     Ward?    @relation(fields: [homeWardId], references: [id])
+  homeWardId   String?
+  isActive     Boolean  @default(true)
+
+  locationMoves   LocationHistory[]
+  statusChanges   StatusHistory[]
+  reportedRepairs MaintenanceRecord[]
+  approvedDisposals DisposalRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Ventilator {
+  id                 String   @id @default(cuid())
+  assetNumber        String   @unique
+  serialNumber       String   @unique
+  deviceCode         String   @unique
+  brand              String
+  model              String
+  registrationDate   DateTime
+  purchaseDate       DateTime?
+  purchasePrice      Decimal?
+  warrantyExpiryDate DateTime?
+  vendor             Vendor?  @relation(fields: [vendorId], references: [id])
+  vendorId           String?
+  currentWard        Ward     @relation(fields: [currentWardId], references: [id])
+  currentWardId      String
+  currentStatus      VentilatorStatus @default(AVAILABLE)
+  isReserveUnit      Boolean
+
+  locationHistory LocationHistory[]
+  statusHistory   StatusHistory[]
+  maintenance     MaintenanceRecord[]
+  disposal        DisposalRecord?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LocationHistory {
+  id            String     @id @default(cuid())
+  ventilator    Ventilator @relation(fields: [ventilatorId], references: [id])
+  ventilatorId  String
+  fromWard      Ward?      @relation("MoveOrigin", fields: [fromWardId], references: [id])
+  fromWardId    String?
+  toWard        Ward       @relation("MoveDestination", fields: [toWardId], references: [id])
+  toWardId      String
+  moveType      MoveType
+  moveDatetime  DateTime   @default(now())
+  movedBy       User       @relation(fields: [movedById], references: [id])
+  movedById     String
+  note          String?
+
+  @@index([ventilatorId])
+}
+
+model StatusHistory {
+  id               String           @id @default(cuid())
+  ventilator       Ventilator       @relation(fields: [ventilatorId], references: [id])
+  ventilatorId     String
+  status           VentilatorStatus
+  statusDatetime   DateTime         @default(now())
+  changedBy        User             @relation(fields: [changedById], references: [id])
+  changedById      String
+  note             String?
+
+  @@index([ventilatorId])
+}
+
+model MaintenanceRecord {
+  id                  String            @id @default(cuid())
+  ventilator          Ventilator        @relation(fields: [ventilatorId], references: [id])
+  ventilatorId        String
+  maintenanceType     MaintenanceType
+  reportedDate        DateTime          @default(now())
+  reportedBy          User              @relation(fields: [reportedById], references: [id])
+  reportedById        String
+  problemDescription  String
+  vendor              Vendor?           @relation(fields: [vendorId], references: [id])
+  vendorId            String?
+  technicianName      String?
+  startDate           DateTime?
+  completeDate        DateTime?
+  cost                Decimal?
+  partsReplaced       String?
+  result              MaintenanceResult?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ventilatorId])
+}
+
+model DisposalRecord {
+  id                   String         @id @default(cuid())
+  ventilator           Ventilator     @relation(fields: [ventilatorId], references: [id])
+  ventilatorId         String         @unique
+  requestDate          DateTime       @default(now())
+  reason               String
+  committeeApprovalNo  String
+  approvalDate         DateTime?
+  disposalMethod       DisposalMethod
+  disposalDate         DateTime?
+  approvedBy           User           @relation(fields: [approvedById], references: [id])
+  approvedById         String
+
+  createdAt DateTime @default(now())
+}
