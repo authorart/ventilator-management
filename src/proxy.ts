@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
-  const isLoginPage = req.nextUrl.pathname === "/login";
+  const path = req.nextUrl.pathname;
+  const isLoginPage = path === "/login";
 
   if (!isLoggedIn && !isLoginPage) {
     const loginUrl = new URL("/login", req.nextUrl.origin);
@@ -12,6 +13,11 @@ export default auth((req) => {
 
   if (isLoggedIn && isLoginPage) {
     return NextResponse.redirect(new URL("/", req.nextUrl.origin));
+  }
+
+  // First login (or admin reset): nothing else is reachable until the password is changed.
+  if (isLoggedIn && req.auth?.user.mustChangePassword && path !== "/change-password") {
+    return NextResponse.redirect(new URL("/change-password", req.nextUrl.origin));
   }
 });
 

@@ -34,6 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.fullName,
           role: user.role,
           homeWardId: user.homeWardId,
+          mustChangePassword: user.mustChangePassword,
         };
       },
     }),
@@ -43,6 +44,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.role = user.role;
         token.homeWardId = user.homeWardId ?? null;
+        token.mustChangePassword = user.mustChangePassword;
       }
       return token;
     },
@@ -50,6 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = token.sub as string;
       session.user.role = token.role as string;
       session.user.homeWardId = (token.homeWardId as string | null) ?? null;
+      session.user.mustChangePassword = Boolean(token.mustChangePassword);
       return session;
     },
   },

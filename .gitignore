@@ -43,4 +43,8 @@ next-env.d.ts
 
 # Claude Code plugin/skill cache (tooling, not app source)
 /.agents/
+/.claude/
 skills-lock.json
+
+.vercel
+.env*

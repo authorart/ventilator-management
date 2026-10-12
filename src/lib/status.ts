@@ -23,3 +23,17 @@ export const ROLE_LABEL: Record<string, string> = {
   EQUIPMENT_CENTER: "เจ้าหน้าที่ศูนย์เครื่องมือ",
   WARD_STAFF: "เจ้าหน้าที่หอผู้ป่วย",
 };
+
+export const STATUS_BAR_CLASS: Record<VentilatorStatus, string> = {
+  AVAILABLE: "bg-emerald-500",
+  IN_USE: "bg-blue-500",
+  AWAITING_REPAIR: "bg-amber-500",
+  UNDER_MAINTENANCE: "bg-orange-500",
+  DAMAGED_PENDING_DISPOSAL: "bg-red-500",
+  DISPOSED: "bg-gray-400",
+};
+
+export const CATEGORY_LABEL: Record<string, string> = {
+  DEDICATED: "ประจำ",
+  RESERVE: "สำรอง",
+};

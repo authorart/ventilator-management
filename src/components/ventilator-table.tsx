@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   Table,
@@ -76,7 +77,9 @@ export function VentilatorTable({
           {ventilators.map((v) => (
             <TableRow key={v.id}>
               <TableCell>
-                <div className="font-medium">{v.assetNumber}</div>
+                <Link href={`/ventilators/${v.id}`} className="font-medium hover:text-primary hover:underline">
+                  {v.assetNumber}
+                </Link>
                 <div className="text-xs text-muted-foreground">ID: {v.deviceCode}</div>
               </TableCell>
               <TableCell>
@@ -95,6 +98,14 @@ export function VentilatorTable({
                       currentStatus={v.currentStatus}
                     />
                     <MoveDialog ventilatorId={v.id} wards={wards.filter((w) => w.id !== v.wardId)} />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      nativeButton={false}
+                      render={<Link href={`/ventilators/${v.id}/edit`} />}
+                    >
+                      แก้ไข
+                    </Button>
                   </>
                 ) : null}
               </TableCell>

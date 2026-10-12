@@ -7,5 +7,6 @@ export const permissions = {
   canReportProblem: () => true,
   canProcessMaintenance: (role: Role) => role === "ADMIN" || role === "EQUIPMENT_CENTER",
   canProcessDisposal: (role: Role) => role === "ADMIN" || role === "EQUIPMENT_CENTER",
+  canManageLocations: (role: Role) => role === "ADMIN" || role === "EQUIPMENT_CENTER",
   canManageUsers: (role: Role) => role === "ADMIN",
 };

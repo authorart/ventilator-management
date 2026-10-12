@@ -1,11 +1,22 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import { loginAction } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+
+function PasswordChangedNotice() {
+  const changed = useSearchParams().get("changed");
+  return changed ? (
+    <p role="status" className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+      เปลี่ยนรหัสผ่านเรียบร้อยแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่
+    </p>
+  ) : null;
+}
 
 export default function LoginPage() {
   const [state, formAction, isPending] = useActionState(loginAction, undefined);
@@ -19,13 +30,16 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-4">
+            <Suspense>
+              <PasswordChangedNotice />
+            </Suspense>
             <div className="space-y-2">
               <Label htmlFor="username">ชื่อผู้ใช้</Label>
               <Input id="username" name="username" required autoFocus autoComplete="username" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">รหัสผ่าน</Label>
-              <Input id="password" name="password" type="password" required autoComplete="current-password" />
+              <PasswordInput id="password" name="password" required autoComplete="current-password" />
             </div>
             {state?.error ? (
               <p className="text-sm text-destructive">{state.error}</p>

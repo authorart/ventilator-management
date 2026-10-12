@@ -1,10 +1,52 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { permissions, type Role } from "@/lib/permissions";
-import { MoveType, VentilatorStatus, MaintenanceType } from "@prisma/client";
+import { ventilatorFormSchema, type VentilatorFormValues } from "@/lib/validation";
+import { MoveType, VentilatorStatus, MaintenanceType, Prisma } from "@prisma/client";
+
+export type VentilatorFormState = {
+  error?: string;
+  fieldErrors?: Record<string, string>;
+};
+
+const UNIQUE_FIELD_LABEL: Record<string, string> = {
+  assetNumber: "เลขครุภัณฑ์",
+  serialNumber: "Serial number",
+  deviceCode: "ID เครื่อง",
+};
+
+function parseVentilatorForm(formData: FormData) {
+  const raw = Object.fromEntries(formData.entries());
+  const parsed = ventilatorFormSchema.safeParse(raw);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const key = issue.path[0];
+      if (typeof key === "string") fieldErrors[key] = issue.message;
+    }
+    return { success: false as const, fieldErrors };
+  }
+  return { success: true as const, data: parsed.data };
+}
+
+function toDbValues(data: VentilatorFormValues) {
+  return {
+    assetNumber: data.assetNumber,
+    serialNumber: data.serialNumber,
+    deviceCode: data.deviceCode,
+    brand: data.brand,
+    model: data.model,
+    registrationDate: new Date(data.registrationDate),
+    purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : null,
+    purchasePrice: data.purchasePrice ? Number(data.purchasePrice) : null,
+    warrantyExpiryDate: data.warrantyExpiryDate ? new Date(data.warrantyExpiryDate) : null,
+    vendorId: data.vendorId || null,
+  };
+}
 
 async function requireSession() {
   const session = await auth();
@@ -50,7 +92,7 @@ export async function reportProblem(ventilatorId: string, description: string) {
     }),
   ]);
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function updateStatus(ventilatorId: string, status: VentilatorStatus, note?: string) {
@@ -75,7 +117,7 @@ export async function updateStatus(ventilatorId: string, status: VentilatorStatu
     }),
   ]);
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
 }
 
 export async function moveVentilator(
@@ -111,5 +153,83 @@ export async function moveVentilator(
     }),
   ]);
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
+}
+
+export async function createVentilator(
+  _prevState: VentilatorFormState,
+  formData: FormData,
+): Promise<VentilatorFormState> {
+  const session = await requireSession();
+  const role = session.user.role as Role;
+  if (!permissions.canEditFleet(role)) {
+    return { error: "คุณไม่มีสิทธิ์เพิ่มเครื่องช่วยหายใจ" };
+  }
+
+  const parsed = parseVentilatorForm(formData);
+  if (!parsed.success) {
+    return { error: "กรุณาตรวจสอบข้อมูลที่กรอก", fieldErrors: parsed.fieldErrors };
+  }
+  if (!parsed.data.currentWardId) {
+    return {
+      error: "กรุณาตรวจสอบข้อมูลที่กรอก",
+      fieldErrors: { currentWardId: "กรุณาเลือกตำแหน่งที่ตั้ง" },
+    };
+  }
+
+  const ward = await prisma.ward.findUniqueOrThrow({ where: { id: parsed.data.currentWardId } });
+
+  try {
+    await prisma.ventilator.create({
+      data: {
+        ...toDbValues(parsed.data),
+        currentWardId: ward.id,
+        isReserveUnit: ward.category === "RESERVE",
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const field = (error.meta?.target as string[] | undefined)?.[0];
+      const label = field ? (UNIQUE_FIELD_LABEL[field] ?? field) : "ข้อมูล";
+      return { error: `${label} นี้มีอยู่ในระบบแล้ว` };
+    }
+    throw error;
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/ventilators");
+}
+
+export async function updateVentilator(
+  ventilatorId: string,
+  _prevState: VentilatorFormState,
+  formData: FormData,
+): Promise<VentilatorFormState> {
+  const session = await requireSession();
+  const role = session.user.role as Role;
+  if (!permissions.canEditFleet(role)) {
+    return { error: "คุณไม่มีสิทธิ์แก้ไขข้อมูลเครื่องช่วยหายใจ" };
+  }
+
+  const parsed = parseVentilatorForm(formData);
+  if (!parsed.success) {
+    return { error: "กรุณาตรวจสอบข้อมูลที่กรอก", fieldErrors: parsed.fieldErrors };
+  }
+
+  try {
+    await prisma.ventilator.update({
+      where: { id: ventilatorId },
+      data: toDbValues(parsed.data),
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const field = (error.meta?.target as string[] | undefined)?.[0];
+      const label = field ? (UNIQUE_FIELD_LABEL[field] ?? field) : "ข้อมูล";
+      return { error: `${label} นี้มีอยู่ในระบบแล้ว` };
+    }
+    throw error;
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/ventilators");
 }
